@@ -2,10 +2,10 @@ version: '3.8'
 
 services:
   sonarr-missing-search:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
-    image: sonarr-missing-search:local
+    image: agreenbhm/sonarr-missing-search:latest
     container_name: sonarr-missing-search
     environment:
       - SONARR_URL=http://sonarr:8989  # Internal docker network URL to Sonarr
