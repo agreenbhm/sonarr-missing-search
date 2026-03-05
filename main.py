@@ -12,54 +12,59 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
+def get_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 def trigger_recent_missing_search():
+    now_ts = get_timestamp()
+    
     # 1. Fetch the wanted/missing list
     url_missing = f"{SONARR_URL}/api/v3/wanted/missing"
     params = {
         "page": 1,
-        "pageSize": 1000, # Adjust if your missing list is massive
+        "pageSize": 1000,
         "sortKey": "airDateUtc",
         "sortDirection": "descending"
     }
     
-    response = requests.get(url_missing, headers=HEADERS, params=params)
-    response.raise_for_status()
-    data = response.json()
-    
+    try:
+        response = requests.get(url_missing, headers=HEADERS, params=params)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print(f"[{now_ts}] Error connecting to Sonarr: {e}")
+        return
+
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=DAYS_BACK)
     episode_ids = []
 
     # 2. Filter for recently aired episodes
     for record in data.get('records', []):
         air_date_str = record.get('airDateUtc')
-        if not air_date_str:
-            continue
+        if not air_date_str: continue
             
         try:
-            # Strip milliseconds/Z for consistent parsing
             air_date = datetime.strptime(air_date_str[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
+        except ValueError: continue
             
         if air_date >= cutoff_date:
             episode_ids.append(record['id'])
 
+    # Log the search window and findings
+    print(f"[{now_ts}] Check complete. Window: last {DAYS_BACK} days. Found: {len(episode_ids)} missing.")
+
     if not episode_ids:
-        print("No missing episodes found within the specified timeframe.")
         return
 
-    print(f"Found {len(episode_ids)} missing episode(s) aired in the last {DAYS_BACK} days.")
-
-    # 3. Trigger active search for those specific IDs
+    # 3. Trigger active search
     url_command = f"{SONARR_URL}/api/v3/command"
-    payload = {
-        "name": "EpisodeSearch",
-        "episodeIds": episode_ids
-    }
+    payload = {"name": "EpisodeSearch", "episodeIds": episode_ids}
     
-    cmd_response = requests.post(url_command, headers=HEADERS, json=payload)
-    cmd_response.raise_for_status()
-    print("Search command successfully dispatched to Sonarr.")
+    try:
+        requests.post(url_command, headers=HEADERS, json=payload).raise_for_status()
+        print(f"[{now_ts}] Search command dispatched for {len(episode_ids)} episodes.")
+    except Exception as e:
+        print(f"[{now_ts}] Failed to dispatch search: {e}")
 
 if __name__ == "__main__":
     trigger_recent_missing_search()
