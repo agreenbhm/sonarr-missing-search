@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py .
 
 # Run the script, wait 6 hours, repeat. Adjust sleep duration as needed.
-CMD ["sh", "-c", "while true; do python main.py; sleep 21600; done"]
+CMD ["sh", "-c", "sleep 60; while true; do python main.py; sleep 21600; done"]
